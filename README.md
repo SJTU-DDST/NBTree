@@ -1,4 +1,4 @@
-# zTree
+# NBTree
 
 ## Dependencies
 * gcc: 7.5.0
