@@ -952,7 +952,7 @@ btree::btree()
   root = (char *)anchor;
   data_anchor = anchor->data;
   height = 1;
-  printf("***** New ztree **** \n");
+  printf("***** New NBTree **** \n");
 }
 
 btree::~btree()

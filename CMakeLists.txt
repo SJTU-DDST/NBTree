@@ -12,8 +12,8 @@ link_libraries(boost_system boost_thread pthread pmemobj pmem)
 include_directories("third-party-lib")
 include_directories("include")
 
-add_executable(ztree
-	src/ztree.cpp
+add_executable(nbtree
+	src/nbtree.cpp
 	src/util.cpp
 )
 

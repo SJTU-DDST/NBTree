@@ -32,17 +32,17 @@
 ```
 ### Single thread evaluation
 ```
-    ./ztree -b ${benchmark}
+    ./nbtree -b ${benchmark}
 ```
 
 ### Multi-threaded evaluation
 ```
-    ./ztree -b ${benchmark} -n ${num_thread}
+    ./nbtree -b ${benchmark} -n ${num_thread}
 ```
 
 ### YCSB
 ```
-    ./ztree -b ${benchmark} -n ${num_thread} -w 1 -S ${skewness} -r ${read_ratio}
+    ./nbtree -b ${benchmark} -n ${num_thread} -w 1 -S ${skewness} -r ${read_ratio}
 ```
 
 
