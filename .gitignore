@@ -1,0 +1,5 @@
+*.out
+*.cmake
+*.bin
+
+build/
