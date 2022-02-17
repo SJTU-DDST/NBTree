@@ -1499,7 +1499,7 @@ bool btree::modify(leaf_node_t *leaf, int pos, entry_key_t key, char *right)
         if ((new_value & (~MASK)) == old_value)
           return true;
 
-      } while (!__sync_bool_compare_and_swap(&(new_leaf->data->kv[npos].ptr), (char *)old_value, (char *)(new_value | SYNC_MASK)));
+      } while (!__sync_bool_compare_and_swap(&(new_leaf->data->kv[npos].ptr), (char *)new_value, (char *)(old_value | SYNC_MASK)));
       leaf = new_leaf;
     }
   }
@@ -1617,7 +1617,7 @@ bool btree::update(entry_key_t key, char *right)
         if ((new_value & (~MASK)) == old_value)
           return true;
 
-      } while (!__sync_bool_compare_and_swap(&(new_leaf->data->kv[npos].ptr), (char *)old_value, (char *)(new_value | SYNC_MASK)));
+      } while (!__sync_bool_compare_and_swap(&(new_leaf->data->kv[npos].ptr), (char *)new_value, (char *)(old_value | SYNC_MASK)));
       leaf = new_leaf;
     }
   }
