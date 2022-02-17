@@ -11,7 +11,7 @@
 #include <sys/mman.h>
 
 #define PERF_LATENCY
-// #define BREAKDOWN
+
 
 char *thread_space_start_addr;
 __thread char *start_addr;
@@ -30,48 +30,33 @@ class Coordinator
 	class Result
 	{
 	public:
-		double throughput;
-		double insert_count;
-		double update_count;
-		double delete_count;
-		double read_count;
-		int insert_lat[100000], update_lat[100000], delete_lat[100000], read_lat[100000];
+		uint64_t throughput;
+		int lat[100000];
 
 		Result()
 		{
-			insert_count = update_count = delete_count = read_count = 0;
+			throughput = 0;
 			for (int i = 0; i < 100000; ++i)
 			{
-				insert_lat[i] = 0;
-				update_lat[i] = 0;
-				delete_lat[i] = 0;
-				read_lat[i] = 0;
+				lat[i] = 0;
 			}
 		}
+
 		void operator+=(Result &r)
 		{
 			this->throughput += r.throughput;
-			this->insert_count += r.insert_count;
-			this->update_count += r.update_count;
-			this->delete_count += r.delete_count;
-			this->read_count += r.read_count;
 		}
+
 		void operator/=(double r)
 		{
 			this->throughput /= r;
-			this->insert_count /= r;
-			this->update_count /= r;
-			this->delete_count /= r;
-			this->read_count /= r;
 		}
+
 		void add_latency(Result &r)
 		{
 			for (int i = 0; i < 100000; ++i)
 			{
-				insert_lat[i] += r.insert_lat[i];
-				update_lat[i] += r.update_lat[i];
-				delete_lat[i] += r.delete_lat[i];
-				read_lat[i] += r.read_lat[i];
+				lat[i] += r.lat[i];
 			}
 		}
 	};
@@ -137,119 +122,62 @@ public:
 	}
 	void worker(btree *tree, int workerid, Result *result, Benchmark *b)
 	{
+		long long lat;
+		nsTimer clk;
 		start_addr = thread_space_start_addr + workerid * SPACE_PER_THREAD;
 		curr_addr = start_addr;
-
 		start_mem = thread_mem_start_addr + workerid * MEM_PER_THREAD;
 		curr_mem = start_mem;
 
 		Benchmark *benchmark = getBenchmark(conf, workerid);
-		if (conf.benchmark == INSERT_ONLY || conf.benchmark == MIX_ID || conf.benchmark == MIX_UI || conf.benchmark == UPSERT)
+		if (conf.benchmark == INSERT_ONLY || conf.benchmark == UPSERT)
 		{
 			memset(start_addr, 0, SPACE_PER_THREAD);
 			clear_cache();
 		}
-		bool upsert = false;
-		if (conf.benchmark == UPSERT)
-		{
-			upsert = true;
-		}
 
 		stick_this_thread_to_core(workerid * 2 + 1);
-
 		printf("[WORKER]\thello, I am worker %d\n", workerid);
 		bar->wait();
-
-		static int scan_values = 0;
-		int frequency = conf.throughput / conf.num_threads;
-		int submit_time = 1000000000.0 / frequency;
-
-		bool flag = true;
-		nsTimer runtime, tmp;
-		bool debug = false;
-
-		unsigned long tx = 0;
-		long long lat;
-		uint64_t ins_count, upd_count, del_count, rd_count;
-		ins_count = upd_count = del_count = rd_count = 0;
-
-		int insert_max, update_max, delete_max, read_max;
-		insert_max = update_max = delete_max = read_max = 0;
-		nsTimer insert_clk[15], update_clk[15], delete_clk[15], read_clk[15], clk[15];
 
 		while (done == 0)
 		{
 			volatile auto next_operation = benchmark->nextOperation();
 			OperationType op = next_operation.first;
 			long long d = next_operation.second;
-
+		#ifdef PERF_LATENCY
+			clk.start();
+		#endif
 			switch (op)
 			{
-
 			case INSERT:
-#ifdef PERF_LATENCY
-				insert_clk[0].start();
-#ifdef BREAKDOWN
-				tree->insert(d, (char *)(d), upsert, debug, clk);
-#else
-				tree->insert(d, (char *)(d), upsert, debug);
-#endif
-				lat = insert_clk[0].end();
-				result->insert_count++;
-				result->insert_lat[lat / 10] += 1;
-#else
-				tree->insert(d, (char *)(d), upsert, debug);
-#endif
+				tree->insert(d, (char *)(d));
 				break;
 			case REMOVE:
-#ifdef PERF_LATENCY
-				delete_clk[0].start();
 				tree->remove(d);
-				lat = delete_clk[0].end();
-				result->delete_count++;
-				result->delete_lat[lat / 10] += 1;
-
-#else
-				tree->remove(d);
-#endif
 				break;
 			case UPDATE:
-#ifdef PERF_LATENCY
-				update_clk[0].start();
-				tree->update(d, (char *)(d + tx + 1));
-				lat = update_clk[0].end();
-				result->update_count++;
-				result->update_lat[lat / 10] += 1;
-#else
-				tree->update(d, (char *)(d + tx + 1));
-#endif
+				tree->update(d, (char *)(d + result->throughput + 1));
 				break;
 			case GET:
-#ifdef PERF_LATENCY
-				read_clk[0].start();
 				tree->search(d);
-				lat = read_clk[0].end();
-				result->read_count++;
-				result->read_lat[lat / 10] += 1;
-#else
-				tree->search(d);
-#endif
-				break;
-			case SCAN:
-				scan_values = 0;
 				break;
 			default:
 				printf("not support such operation: %d\n", op);
 				exit(-1);
 			}
+		#ifdef PERF_LATENCY
+			lat = clk.end();
+			result->lat[lat/10] +=1;	
+		#endif
 			result->throughput++;
-			tx++;
 		}
 	}
 
 	void run()
 	{
-		int fd = open("/home/bowen/mnt/pmem1/btree", O_RDWR);
+		// Create memory pool
+		int fd = open("/mnt/pmem1/btree", O_RDWR);
 		if (fd < 0)
 		{
 			printf("[NVM MGR]\tfailed to open nvm file\n");
@@ -265,87 +193,61 @@ public:
 		start_addr = (char *)pmem;
 		curr_addr = start_addr;
 		thread_space_start_addr = (char *)pmem + SPACE_OF_MAIN_THREAD;
-
-		void *mem;
-		mem = new char[allocate_mem];
+		void *mem = new char[allocate_mem];
 		start_mem = (char *)mem;
 		curr_mem = start_mem;
 		thread_mem_start_addr = (char *)mem + MEM_OF_MAIN_THREAD;
-
-		printf("[COORDINATOR]\tStart benchmark..\n");
+		
+		// Warm-up
+		printf("[COORDINATOR]\tWarm-up..\n");
 		btree *tree = new btree();
-
 		Benchmark *benchmark = getBenchmark(conf);
-		timer init, runtime;
-
+		nsTimer init, runtime;
 		init.start();
-		double a[3];
 		for (unsigned long i = 0; i < conf.init_keys; i++)
 		{
 
 			uint64_t key = benchmark->nextInitKey();
 			tree->insert(key, (char *)key);
 		}
-
 		init.end();
 		clear_cache();
 		printf("warm-up time:%.3f ms\n", init.duration() / 1000000.0);
 		printf("average insert time:%.3f us\n", init.duration() / conf.init_keys / 1000.0);
 
+		// Start benchmark
+		printf("[COORDINATOR]\tStart benchmark..\n");
 		Result *results = new Result[conf.num_threads];
 		memset(results, 0, sizeof(Result) * conf.num_threads);
-
 		std::thread **pid = new std::thread *[conf.num_threads];
 		bar = new boost::barrier(conf.num_threads + 1);
-
 		for (int i = 0; i < conf.num_threads; i++)
 		{
 			pid[i] = new std::thread(&Coordinator::worker, this, tree, i, &results[i], benchmark);
 		}
-
 		bar->wait();
 		runtime.start();
 		usleep(conf.duration * 1000000);
 		done = 1;
 
+		// Get results
 		Result final_result;
 		for (int i = 0; i < conf.num_threads; i++)
 		{
 			pid[i]->join();
 			final_result += results[i];
-
-			printf("[WORKER]\tworker %d result %lf\n", i, results[i].throughput);
+			printf("[WORKER]\tworker %d result %ld\n", i, results[i].throughput);
 		}
 		runtime.end();
-		printf("runtime:%.3f ms\n", runtime.duration() / 1000000);
+		printf("runtime:%.3f ms\n", (double)runtime.duration() / 1000000);
 		printf("[COORDINATOR]\tFinish benchmark..\n");
 		printf("[COORDINATOR]\ttotal throughput: %.3lf Mtps\n", (double)final_result.throughput / 1000000.0 / conf.duration);
-
 #ifdef PERF_LATENCY
 		for (int i = 0; i < conf.num_threads; i++)
 		{
 			final_result.add_latency(results[i]);
 		}
-		if (conf.benchmark == INSERT_ONLY || conf.benchmark == UPSERT || conf.benchmark == MIX_ID)
-		{
-			printf("insert latency analysis:\n");
-			print_taillatency(final_result.insert_lat, final_result.insert_count, "insert");
-		}
-		if (conf.benchmark == UPDATE_ONLY || conf.benchmark == YCSB_A)
-		{
-			printf("update latency analysis:\n");
-			print_taillatency(final_result.update_lat, final_result.update_count, "update");
-		}
-		if (conf.benchmark == DELETE_ONLY || conf.benchmark == MIX_ID)
-		{
-			printf("delete latency analysis:\n");
-			print_taillatency(final_result.delete_lat, final_result.delete_count, "delete");
-		}
-		if (conf.benchmark == READ_ONLY || conf.benchmark == YCSB_A || conf.benchmark == UPSERT)
-		{
-			printf("read latency analysis:\n");
-			print_taillatency(final_result.read_lat, final_result.read_count, "read");
-		}
+		print_taillatency(final_result.lat, final_result.throughput, "total");
 #endif
 
 		delete tree;

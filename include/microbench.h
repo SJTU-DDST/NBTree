@@ -13,9 +13,6 @@ enum OperationType
 	REMOVE,
 	UPDATE,
 	GET,
-	SCAN,
-	PRINT,
-	MIXED,
 	_OpreationTypeNumber
 };
 
@@ -58,10 +55,6 @@ public:
 		else if (conf.workload == ZIPFIAN)
 		{
 			workload = new ZipfWrapper(conf.skewness, conf.init_keys);
-		}
-		else
-		{
-			workload = new MonotonicGenerator();
 		}
 
 		x = NULL;
@@ -122,32 +115,13 @@ public:
 	}
 	std::pair<OperationType, long long> nextOperation()
 	{
-		if (_conf.workload == MONOTONIC)
-		{
-			return std::make_pair(INSERT, workload->Next() * (id + 1) + _conf.init_keys);
-		}
-		else
-		{
-			long long d = workload->Next() % _conf.init_keys;
-			long long x = salt->Next() % (INTERVAL - 1) + 1;
-			return std::make_pair(INSERT, (d + 1) * INTERVAL + x);
-		}
+		long long d = workload->Next() % _conf.init_keys;
+		long long x = salt->Next() % (INTERVAL - 1) + 1;
+		return std::make_pair(INSERT, (d + 1) * INTERVAL + x);	
 	}
 	long long nextInitKey()
 	{
-		if (_conf.workload == MONOTONIC)
-		{
-			return Benchmark::nextInitKey();
-		}
-		else
-			return INTERVAL * Benchmark::nextInitKey();
-	}
-	void test()
-	{
-		for (int i = 0; i < 128; ++i)
-		{
-			printf("%d\n", ct[i]);
-		}
+		return INTERVAL * Benchmark::nextInitKey();
 	}
 };
 
@@ -181,62 +155,9 @@ public:
 	}
 };
 
-class MixedBench : public Benchmark
-{
-
-	RandomGenerator rdm;
-	int round;
-	long long key;
-
-public:
-	MixedBench(Config &conf) : Benchmark(conf)
-	{
-	}
-	std::pair<OperationType, long long> nextOperation()
-	{
-		std::pair<OperationType, long long> result;
-		long long _key = workload->Next() % _conf.init_keys + 1;
-		switch (round)
-		{
-		case 0:
-			key = workload->Next() % _conf.init_keys + 1;
-			result = std::make_pair(REMOVE, key);
-			break;
-		case 1:
-			result = std::make_pair(INSERT, key);
-			break;
-		case 2:
-			result = std::make_pair(UPDATE, _key);
-			break;
-		case 3:
-			result = std::make_pair(GET, _key);
-			break;
-		default:
-			assert(0);
-		}
-		round++;
-		round %= 4;
-		return result;
-	}
-};
-
-class ScanBench : public Benchmark
-{
-public:
-	ScanBench(Config &conf) : Benchmark(conf) {}
-
-	std::pair<OperationType, long long> nextOperation()
-	{
-		long long d = workload->Next() % _conf.init_keys + 1;
-		return std::make_pair(SCAN, d);
-	}
-};
-
 class YSCBA : public Benchmark
 {
 public:
-	//	readRate = 0.5;
-	//	writeRate = 0.5;
 	int read_ratio;
 
 	RandomGenerator rdm;
@@ -262,8 +183,6 @@ public:
 class Upsert : public Benchmark
 {
 public:
-	//	readRate = 0.5;
-	//	writeRate = 0.5;
 	int read_ratio = 50;
 	int interval;
 	RandomGenerator rdm;
@@ -292,163 +211,6 @@ public:
 	long long nextInitKey()
 	{
 		return interval * Benchmark::nextInitKey();
-	}
-};
-
-class RIBench : public Benchmark
-{
-public:
-	RandomGenerator rdm;
-	RandomGenerator *salt;
-	int read_ratio = 90;
-	RIBench(Config &conf) : Benchmark(conf)
-	{
-		read_ratio = conf.read_ratio;
-		salt = new RandomGenerator();
-	}
-	virtual std::pair<OperationType, long long> nextOperation()
-	{
-		int k = rdm.randomInt() % 100;
-		if (k < read_ratio)
-		{
-
-			long long d = workload->Next() % _conf.init_keys + 1;
-			return std::make_pair(GET, d * INTERVAL);
-		}
-		else
-		{
-			long long d = workload->Next() % _conf.init_keys + 1;
-			long long x = salt->Next() % (INTERVAL - 1) + 1;
-			return std::make_pair(INSERT, d * INTERVAL + x);
-		}
-	}
-	long long nextInitKey()
-	{
-		return INTERVAL * Benchmark::nextInitKey();
-	}
-};
-
-class RDBench : public Benchmark
-{
-public:
-	int read_ratio = 90;
-
-	RandomGenerator rdm;
-	RDBench(Config &conf) : Benchmark(conf)
-	{
-		read_ratio = conf.read_ratio;
-	}
-	virtual std::pair<OperationType, long long> nextOperation()
-	{
-		int k = rdm.randomInt() % 100;
-
-		if (k > read_ratio)
-		{
-			return std::make_pair(REMOVE, workload->Next() % _conf.init_keys + 1);
-		}
-		else
-		{
-			return std::make_pair(GET, workload->Next() % _conf.init_keys + 1);
-		}
-	}
-};
-
-class UIBench : public Benchmark
-{
-public:
-	RandomGenerator rdm;
-	RandomGenerator *salt;
-	int update_ratio = 90;
-	UIBench(Config &conf) : Benchmark(conf)
-	{
-		update_ratio = conf.read_ratio;
-		salt = new RandomGenerator();
-	}
-	virtual std::pair<OperationType, long long> nextOperation()
-	{
-		int k = rdm.randomInt() % 100;
-		if (k < update_ratio)
-		{
-			long long d = workload->Next() % _conf.init_keys + 1;
-			return std::make_pair(UPDATE, d * INTERVAL);
-		}
-		else
-		{
-			long long d = workload->Next() % _conf.init_keys + 1;
-			long long x = salt->Next() % (INTERVAL - 1) + 1;
-			return std::make_pair(INSERT, d * INTERVAL + x);
-		}
-	}
-	long long nextInitKey()
-	{
-		return INTERVAL * Benchmark::nextInitKey();
-	}
-};
-
-class IDBench : public Benchmark
-{
-public:
-	RandomGenerator rdm;
-	RandomGenerator *salt;
-	int insert_ratio = 50;
-	IDBench(Config &conf) : Benchmark(conf)
-	{
-		insert_ratio = conf.read_ratio;
-		salt = new RandomGenerator();
-	}
-	virtual std::pair<OperationType, long long> nextOperation()
-	{
-		int k = rdm.randomInt() % 100;
-		if (k > insert_ratio)
-		{
-			long long d = workload->Next() % _conf.init_keys + 1;
-			return std::make_pair(REMOVE, d * INTERVAL);
-		}
-		else
-		{
-			long long d = workload->Next() % _conf.init_keys + 1;
-			long long x = salt->Next() % (INTERVAL - 1) + 1;
-			return std::make_pair(INSERT, d * INTERVAL + x);
-		}
-	}
-	long long nextInitKey()
-	{
-		return INTERVAL * Benchmark::nextInitKey();
-	}
-};
-class YSCBC : public Benchmark
-{
-public:
-	YSCBC(Config &conf) : Benchmark(conf)
-	{
-	}
-	OperationType nextOp()
-	{
-		return GET;
-	}
-};
-
-class YSCBD : public Benchmark
-{
-public:
-	YSCBD(Config &conf) : Benchmark(conf)
-	{
-	}
-	OperationType nextOp()
-	{
-		return GET;
-	}
-};
-
-class YSCBE : public Benchmark
-{
-public:
-	YSCBE(Config &conf) : Benchmark(conf)
-	{
-	}
-	OperationType nextOp()
-	{
-		return GET;
 	}
 };
 

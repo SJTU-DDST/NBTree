@@ -20,7 +20,6 @@ enum DataDistrubute
 {
   RANDOM,
   ZIPFIAN,
-  MONOTONIC,
   _DataDistrbuteNumber
 };
 
@@ -32,14 +31,6 @@ enum BenchMarkType
   DELETE_ONLY,
   YCSB_A,
   UPSERT,
-
-  MIX_RI,
-  MIX_RD,
-  MIX_UI,
-  MIX_ID,
-  MIXED_BENCH,
-  SCAN_BENCH,
-  RECOVERY_BENCH,
   _BenchMarkType
 };
 

@@ -90,22 +90,22 @@ public:
   char *btree_search(entry_key_t);
   void print();
   void check();
-  bool insert(entry_key_t, char *, bool, bool, nsTimer *, int id); // Insert
-  bool remove(entry_key_t);                                        // Remove
-  bool update(entry_key_t, char *);                                // Update
-  char *search(entry_key_t);                                       // Search
+  bool insert(entry_key_t, char *); 
+  bool remove(entry_key_t);
+  bool update(entry_key_t, char *);
+  char *search(entry_key_t);
 private:
   static const uint64_t kFNVPrime64 = 1099511628211;
   unsigned char hashfunc(uint64_t val);
+  int find_item(entry_key_t key, leaf_node_t *leaf, uint8_t hash);
+  bool modify(leaf_node_t *leaf, int pos, entry_key_t key, char *right);
   leaf_node_t *find_leaf(entry_key_t key, inner_node_t **parent, bool debug, bool print);
   leaf_node_t *find_pred_leaf(entry_key_t key, char **prev, inner_node_t **parent);
   leaf_node_t *inner_node_search(entry_key_t key, char **prev, inner_node_t **parent);
   leaf_node_t *inner_node_search(entry_key_t key, inner_node_t **parent, bool debug, bool print);
-  int find_item(entry_key_t key, leaf_node_t *leaf, uint8_t hash);
-  leaf_node_t *SplitLeaf(leaf_node_t *leaf, inner_node_t *parent, leaf_node_t *, entry_key_t, nsTimer *, bool, int);
-  bool modify(leaf_node_t *leaf, int pos, entry_key_t key, char *right);
+  leaf_node_t *SplitLeaf(leaf_node_t *leaf, inner_node_t *parent, leaf_node_t *, entry_key_t, bool, int);
   // help function for split
-  void copy(leaf_node_t *leaf, nsTimer *clk = NULL);
+  void copy(leaf_node_t *leaf);
   void sync(leaf_node_t *leaf);
   void update_prev_node(leaf_node_t *leaf, inner_node_t *parent, leaf_node_t *prev = NULL);
   void update_parent(leaf_node_t *leaf, inner_node_t *parent);
@@ -143,7 +143,6 @@ private:
 public:
   header()
   {
-
     leftmost_ptr = NULL;
     sibling_ptr = NULL;
     pred_ptr = NULL;
@@ -942,9 +941,6 @@ public:
  */
 btree::btree()
 {
-
-  printf("without pmdk!\n");
-
   c++;
   anchor = new leaf_node_t;
   anchor->high_key = (~0llu);
@@ -1166,13 +1162,13 @@ unsigned char btree::hashfunc(uint64_t val)
   return hash;
 }
 
-leaf_node_t *btree::SplitLeaf(leaf_node_t *leaf, inner_node_t *parent, leaf_node_t *prev = NULL, entry_key_t key = 0, nsTimer *clk = NULL, bool debug = false, int id = 0)
+leaf_node_t *btree::SplitLeaf(leaf_node_t *leaf, inner_node_t *parent, leaf_node_t *prev = NULL, entry_key_t key = 0, bool debug = false, int id = 0)
 {
   entry_key_t split_key;
   leaf_node_t *firleaf, *secleaf;
 
   // 1. copy the entry from old leaf to new leaf
-  copy(leaf, clk);
+  copy(leaf);
 
   // 2. sync the update/delete happened in copy phase
   sync(leaf);
@@ -1222,7 +1218,7 @@ bool btree::check_parent(char *left, entry_key_t key, char *right, uint32_t leve
     return false;
 }
 
-void btree::copy(leaf_node_t *leaf, nsTimer *clk)
+void btree::copy(leaf_node_t *leaf)
 {
   if (leaf->log != NULL)
     return;
@@ -1624,7 +1620,7 @@ bool btree::update(entry_key_t key, char *right)
   return true;
 }
 
-bool btree::insert(entry_key_t key, char *right, bool upsert = false, bool debug = false, nsTimer *clk = NULL, int id = 0)
+bool btree::insert(entry_key_t key, char *right)
 {
   leaf_node_t *leaf, *prev = NULL;
   inner_node_t *parent;
@@ -1643,17 +1639,14 @@ bool btree::insert(entry_key_t key, char *right, bool upsert = false, bool debug
     old_slot = find_item(key, leaf, hash);
     if (old_slot >= 0)
     {
-      if (upsert)
-        return modify(leaf, old_slot, key, right);
-      else
-        return false;
+      return modify(leaf, old_slot, key, right);
     }
 
     // 3. Test Full
     if (leaf->number >= LEAF_NODE_SIZE)
     {
       leaf->set_split_bit();
-      leaf = SplitLeaf(leaf, parent, prev, key, clk);
+      leaf = SplitLeaf(leaf, parent, prev, key);
       continue;
     }
     // 4. Allocate the pos
@@ -1662,7 +1655,7 @@ bool btree::insert(entry_key_t key, char *right, bool upsert = false, bool debug
     if (pos > (LEAF_NODE_SIZE - 1))
     {
       leaf->set_split_bit();
-      leaf = SplitLeaf(leaf, parent, prev, key, clk);
+      leaf = SplitLeaf(leaf, parent, prev, key);
       continue;
     }
 
@@ -1680,7 +1673,7 @@ bool btree::insert(entry_key_t key, char *right, bool upsert = false, bool debug
     bool res = leaf->set_slot(pos);
     if (!res)
     {
-      leaf = SplitLeaf(leaf, parent, prev, key, clk);
+      leaf = SplitLeaf(leaf, parent, prev, key);
       continue;
     }
     break;
