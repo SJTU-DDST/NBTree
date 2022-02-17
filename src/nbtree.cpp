@@ -1,4 +1,3 @@
-#include "nbtree.h"
 #include "config.h"
 #include "util.h"
 #include "timer.h"
@@ -11,7 +10,15 @@
 #include <sys/mman.h>
 
 #define PERF_LATENCY
-
+#ifdef NBTREE_WR
+#include "nbtree_wr.h"
+#else
+#ifdef NBTREE_W
+#include "nbtree_w.h"
+#else
+#include "nbtree.h"
+#endif
+#endif
 
 char *thread_space_start_addr;
 __thread char *start_addr;
