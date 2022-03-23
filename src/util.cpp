@@ -59,7 +59,7 @@ int ZipfGenerator::randomInt()
         }
     }
 
-    return hashfunc(res) % size;
+    return res % size;
 }
 
 void ZipfGenerator::init(double s, int inital)

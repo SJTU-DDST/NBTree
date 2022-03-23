@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#define PERF_LATENCY
+// #define PERF_LATENCY
 #ifdef NBTREE_WR
 #include "nbtree_wr.h"
 #else
