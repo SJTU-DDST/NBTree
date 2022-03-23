@@ -17,4 +17,10 @@ add_executable(nbtree
 	src/util.cpp
 )
 
+# add_executable(data_generator
+# 	src/data_generator.cpp
+# 	src/util.cpp
+# )
+
+
 

@@ -191,7 +191,8 @@ public:
 	}
 	double randomDouble()
 	{
-		return erand48(seed) * erand48(seed2);
+		// return erand48(seed) * erand48(seed2);
+		return erand48(seed);
 	}
 	void setSeed(unsigned short newseed[3])
 	{

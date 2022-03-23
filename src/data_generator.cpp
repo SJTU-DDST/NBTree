@@ -44,75 +44,18 @@ static inline unsigned int hashfunc(uint32_t val)
 
 int main(int argc, char **argv)
 {
-	while (true)
+	int number = 16000000;
+	ZipfGenerator zipf(0.99, number);
+	int *count = new int[number]; 
+	for (unsigned long long i = 0; i < number; i++)
+    {
+		int d = zipf.randomInt();
+		// printf("key:%lld\n", d);
+		count[d]++;
+    }
+	for (int i=0;i<10;++i)
 	{
-		int idx = 0;
-		int c = getopt_long(argc, argv, "ht:f:d:s:", dataopts, &idx);
-		if (c == -1)
-			break;
-		switch (c)
-		{
-		case 't':
-			distribute = (DataDistrubute)atoi(optarg);
-			break;
-		case 'f':
-			filename = std::string(optarg);
-			break;
-		case 's':
-			zipfp = atof(optarg);
-			break;
-		case 'd':
-			datasize = atoi(optarg);
-			break;
-		case 'h':
-		default:
-			fprintf(stdout, "Command line options : %s <options> \n"
-							"   -h --help         : Print help message \n"
-							"   -t --type         : 0 (random) 1 (zipfian)\n"
-							"   -s --skew         : zipfian skew parameter\n"
-							"   -f --filename     : output filename\n"
-							"   -d --datasize     : data size\n",
-					argv[0]);
-			exit(EXIT_FAILURE);
-		}
+		printf("%d:%lld\n",i,count[i]);
 	}
 
-	if (filename.empty())
-	{
-		if (distribute == RANDOM)
-		{
-			filename = string("random_data");
-		}
-		else if (distribute == ZIPFIAN)
-		{
-			filename = string("zipfian_data");
-		}
-	}
-
-	if (distribute == RANDOM)
-	{
-		printf("generator random data\n");
-		RandomGenerator rdm;
-		ofstream myfile;
-		myfile.open(filename.c_str(), ios::out | ios::binary);
-		for (unsigned long long i = 0; i < datasize; i++)
-		{
-			int d = rdm.Next();
-			myfile.write((char *)&d, sizeof(int));
-		}
-		myfile.close();
-	}
-	else
-	{
-		printf("generator zipfian data\n");
-		ZipfGenerator rdm(zipfp, 1llu << 25);
-		ofstream myfile;
-		myfile.open(filename, ios::out | ios::binary);
-		for (unsigned long long i = 0; i < datasize; i++)
-		{
-			int d = hashfunc(rdm.Next()) & ((1llu << 31) - 1);
-			myfile.write((char *)&d, sizeof(int));
-		}
-		myfile.close();
-	}
 }

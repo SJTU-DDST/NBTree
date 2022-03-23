@@ -37,41 +37,48 @@ unsigned int hashfunc(uint32_t val)
 int ZipfGenerator::randomInt()
 {
     double d = rdm.randomDouble();
-
     int low = 0, high = size;
-    while (low < high - 1)
+    int res;
+
+
+    while (low < high)
     {
         int mid = (low + high) / 2;
         if (zipfs[mid] <= d && zipfs[mid + 1] > d)
         {
-            low = mid;
+            res = mid;
             break;
         }
-        else if (zipfs[mid] > d)
+        else if (d >= zipfs[mid+1])
+        {
+            low = mid+1;
+        }
+        else if (d < zipfs[mid])
         {
             high = mid;
         }
-        else
-        {
-            low = mid;
-        }
     }
-    return hashfunc(low) % size;
+
+    return hashfunc(res) % size;
 }
 
 void ZipfGenerator::init(double s, int inital)
 {
-    zipfs = new double[inital];
+    zipfs = new double[inital+1];
     double sum = 0.0;
+    zipfs[0] = 0;
     for (int i = 1; i < inital + 1; i++)
     {
-        zipfs[i - 1] = 1.0 / (float)pow((double)i, s);
-        sum += zipfs[i - 1];
+        zipfs[i] = 1.0 / (float)pow((double)i, s);
+        sum += zipfs[i];
     }
-    zipfs[0] = 1.0 / sum;
-    for (int i = 1; i < inital; i++)
+    for (int i = 1; i < inital + 1; i++)
     {
-        zipfs[i] = zipfs[i] / sum + zipfs[i - 1];
+        zipfs[i] = zipfs[i] / sum;
+    }
+    for (int i = 1; i <= inital; i++)
+    {
+        zipfs[i] += zipfs[i - 1];
     }
 }
 
